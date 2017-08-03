@@ -54,10 +54,10 @@ public class HistoricBatchManager extends AbstractManager {
   }
 
   @SuppressWarnings("unchecked")
-  public List<String> findHistoricBatchIdsForCleanup(Integer batchSize, Integer batchHistoryTTL) {
+  public List<String> findHistoricBatchIdsForCleanup(Integer batchSize, Map<String, Integer> batchOperationHistoryTimeToLiveMap) {
     Map<String, Object> map = new HashMap<String, Object>();
     map.put("currentTimestamp", ClockUtil.getCurrentTime());
-    map.put("historyTTL", batchHistoryTTL);
+    map.put("map", batchOperationHistoryTimeToLiveMap);
     ListQueryParameterObject parameterObject = new ListQueryParameterObject();
     parameterObject.setParameter(map);
     parameterObject.getOrderingProperties().add(new QueryOrderingProperty(new QueryPropertyImpl("END_TIME_"), Direction.ASCENDING));

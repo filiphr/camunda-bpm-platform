@@ -25,7 +25,6 @@ import org.apache.commons.lang.time.DateUtils;
 import org.camunda.bpm.engine.HistoryService;
 import org.camunda.bpm.engine.ManagementService;
 import org.camunda.bpm.engine.ProcessEngineConfiguration;
-import org.camunda.bpm.engine.ProcessEngineException;
 import org.camunda.bpm.engine.RuntimeService;
 import org.camunda.bpm.engine.batch.Batch;
 import org.camunda.bpm.engine.batch.history.HistoricBatch;
@@ -46,6 +45,7 @@ import org.camunda.bpm.engine.runtime.Job;
 import org.camunda.bpm.engine.runtime.ProcessInstance;
 import org.camunda.bpm.engine.test.ProcessEngineRule;
 import org.camunda.bpm.engine.test.RequiredHistoryLevel;
+import org.camunda.bpm.engine.test.api.runtime.BatchModificationHelper;
 import org.camunda.bpm.engine.test.api.runtime.migration.MigrationTestRule;
 import org.camunda.bpm.engine.test.api.runtime.migration.batch.BatchMigrationHelper;
 import org.camunda.bpm.engine.test.util.ProcessEngineTestRule;
@@ -64,7 +64,8 @@ public class HistoryCleanupHistoricBatchTest {
   public ProcessEngineRule engineRule = new ProcessEngineRule(true);
   public ProcessEngineTestRule testRule = new ProcessEngineTestRule(engineRule);
   protected MigrationTestRule migrationRule = new MigrationTestRule(engineRule);
-  protected BatchMigrationHelper helper = new BatchMigrationHelper(engineRule, migrationRule);
+  protected BatchMigrationHelper migrationHelper = new BatchMigrationHelper(engineRule, migrationRule);
+  protected BatchModificationHelper modificationHelper = new BatchModificationHelper(engineRule);
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
@@ -83,11 +84,13 @@ public class HistoryCleanupHistoricBatchTest {
     historyService = engineRule.getHistoryService();
     managementService = engineRule.getManagementService();
     processEngineConfiguration = engineRule.getProcessEngineConfiguration();
+    processEngineConfiguration.setBatchOperationHistoryTimeToLive(5);
+    processEngineConfiguration.initHistoryCleanup();
   }
 
   @After
   public void clearDatabase() {
-    helper.removeAllRunningAndHistoricBatches();
+    migrationHelper.removeAllRunningAndHistoricBatches();
 
     processEngineConfiguration.getCommandExecutorTxRequired().execute(new Command<Void>() {
       public Void execute(CommandContext commandContext) {
@@ -119,7 +122,6 @@ public class HistoryCleanupHistoricBatchTest {
     ClockUtil.setCurrentTime(DateUtils.addDays(startDate, daysInThePast));
 
     // given
-    processEngineConfiguration.setBatchOperationHistoryTimeToLive(5);
     prepareHistoricBatches(3, daysInThePast);
 
     // when
@@ -140,7 +142,6 @@ public class HistoryCleanupHistoricBatchTest {
     ClockUtil.setCurrentTime(DateUtils.addDays(startDate, daysInThePast));
 
     // given
-    processEngineConfiguration.setBatchOperationHistoryTimeToLive(5);
     prepareHistoricBatches(1, daysInThePast);
     HistoricBatch batch = historyService.createHistoricBatchQuery().singleResult();
     String batchId = batch.getId();
@@ -155,36 +156,14 @@ public class HistoryCleanupHistoricBatchTest {
     assertEquals(0, historyService.createHistoricJobLogQuery().jobDefinitionConfiguration(batchId).count());
   }
 
-//  @Test
-//  public void testCleanupHistoricIncident() {
-//    // given
-//    processEngineConfiguration.setHistoricBatchHistoryTimeToLive(5);
-//
-//    ClockUtil.setCurrentTime(DateUtils.addDays(new Date(), -11));
-//
-//    Batch batch = createMigrationBatch();
-//    createIncident();
-//    executeBatch(batch);
-//
-//    // when
-//    String jobId = historyService.cleanUpHistoryAsync(true).getId();
-//
-//    managementService.executeJob(jobId);
-//
-//    // then
-//    assertEquals(0, historyService.createHistoricIncidentQuery().count());
-//  }
-
   @Test
   public void testCleanupHistoricIncident() {
     // given
-    processEngineConfiguration.setBatchOperationHistoryTimeToLive(5);
-
     ClockUtil.setCurrentTime(DateUtils.addDays(new Date(), -11));
 
     BatchEntity batch = (BatchEntity) createMigrationBatch();
 
-    helper.executeSeedJob(batch);
+    migrationHelper.executeSeedJob(batch);
 
     List<Job> list = managementService.createJobQuery().list();
     for (Job job : list) {
@@ -192,34 +171,27 @@ public class HistoryCleanupHistoricBatchTest {
         managementService.setJobRetries(job.getId(), 1);
       }
     }
-    helper.executeJobs(batch);
+    migrationHelper.executeJobs(batch);
 
     ClockUtil.setCurrentTime(DateUtils.addDays(new Date(), -10));
-    helper.executeMonitorJob(batch);
+    managementService.deleteBatch(batch.getId(), false);
 
     ClockUtil.setCurrentTime(new Date());
-
-    // when TODO - ne moga da go iztriq
+    // when
     String jobId = historyService.cleanUpHistoryAsync(true).getId();
 
     managementService.executeJob(jobId);
 
-//    HistoricIncident historicIncident = historyService.createHistoricIncidentQuery().singleResult();
-//    assertNull(historicIncident);
-
     List<String> byteArrayIds = findExceptionByteArrayIds();
 
-    verifyByteArraysWereRemoved(byteArrayIds.toArray(new String[] {}));
     assertEquals(0, historyService.createHistoricBatchQuery().count());
     assertEquals(0, historyService.createHistoricIncidentQuery().count());
-    assertEquals(0, historyService.createHistoricJobLogQuery().count());
+    verifyByteArraysWereRemoved(byteArrayIds.toArray(new String[] {}));
   }
 
   @Test
   public void testHistoryCleanupBatchMetrics() {
     // given
-    processEngineConfiguration.setBatchOperationHistoryTimeToLive(5);
-
     int daysInThePast = -11;
     int batchesCount = 5;
     prepareHistoricBatches(batchesCount, daysInThePast);
@@ -236,22 +208,43 @@ public class HistoryCleanupHistoricBatchTest {
   }
 
   @Test
-  public void testConfiguration() {
+  public void testConfiguration() {// TODO
     int days = 5;
-    processEngineConfiguration.setBatchOperationHistoryTimeToLive(days);
-    processEngineConfiguration.initHistoryCleanup();
     assertEquals(days, processEngineConfiguration.getBatchOperationHistoryTimeToLive().intValue());
   }
 
+
   @Test
-  public void testConfigurationFailure() {
-    processEngineConfiguration.setBatchOperationHistoryTimeToLive(-1);
+  public void test1() { // TODO
+    Batch modificationBatch = modificationHelper.startAfterAsync("process1", 1, "user1", "");// TODO processDefinition.getId());
+    List<Batch> batchList = Arrays.asList(modificationBatch);
 
-    thrown.expect(ProcessEngineException.class);
-    thrown.expectMessage("batchOperationHistoryTimeToLive");
+    int migrationCountBatch = 10;
+    for (int i = 0; i < migrationCountBatch ; i++) {
+      batchList.add(migrationHelper.migrateProcessInstancesAsync(1));
+    }
 
-    processEngineConfiguration.initHistoryCleanup();
+    int cancelationCountBatch = 20;
+    for (int i = 0; i < cancelationCountBatch  ; i++) {
+      batchList.add(runtimeService.deleteProcessInstancesAsync(Arrays.asList("unknownId"), "create-deletion-batch"));
+    }
+
+    for (Batch batch : batchList) {
+      managementService.deleteBatch(batch.getId(), false);
+    }
+
+    System.out.println();
   }
+
+//  @Test
+//  public void testConfigurationFailure() {
+//    processEngineConfiguration.setBatchOperationHistoryTimeToLive(-1);
+//
+//    thrown.expect(ProcessEngineException.class);
+//    thrown.expectMessage("batchOperationHistoryTimeToLive");
+//
+//    processEngineConfiguration.initHistoryCleanup();
+//  }
 
   private BpmnModelInstance createModelInstance() {
     BpmnModelInstance instance = Bpmn.createExecutableProcess("process")
@@ -275,30 +268,9 @@ public class HistoryCleanupHistoricBatchTest {
 
     ProcessInstance processInstance = runtimeService.startProcessInstanceById(sourceProcessDefinition.getId());
 
-    Batch batch = runtimeService.newMigration(migrationPlan).processInstanceIds(Arrays.asList(processInstance.getId(), "ser")).executeAsync();
+    Batch batch = runtimeService.newMigration(migrationPlan).processInstanceIds(Arrays.asList(processInstance.getId(), "unknownId")).executeAsync();
     return batch;
   }
-
-//  private void createIncident() {
-//    Job job = managementService.createJobQuery().singleResult();
-//    managementService.setJobRetries(job.getId(), 0);
-//
-//    Incident incident = runtimeService.createIncidentQuery().singleResult();
-//    assertNotNull(incident);
-//  }
-
-//  private void executeBatch(Batch batch) {
-//    helper.executeSeedJob(batch);
-//    helper.executeJobs(batch);
-//
-//    ClockUtil.setCurrentTime(DateUtils.addDays(new Date(), -10));
-//    helper.executeMonitorJob(batch);
-//
-//    ClockUtil.setCurrentTime(new Date());
-//
-//    HistoricIncident historicIncident = historyService.createHistoricIncidentQuery().singleResult();
-//    assertNotNull(historicIncident);
-//  }
 
   private void prepareHistoricBatches(int batchesCount, int daysInThePast) {
     Date startDate = ClockUtil.getCurrentTime();
@@ -306,15 +278,15 @@ public class HistoryCleanupHistoricBatchTest {
 
     List<Batch> list = new ArrayList<Batch>();
     for (int i = 0; i < batchesCount; i++) {
-      list.add(helper.migrateProcessInstancesAsync(1));
+      list.add(migrationHelper.migrateProcessInstancesAsync(1));
     }
 
     for (Batch batch : list) {
-      helper.executeSeedJob(batch);
-      helper.executeJobs(batch);
+      migrationHelper.executeSeedJob(batch);
+      migrationHelper.executeJobs(batch);
 
       ClockUtil.setCurrentTime(DateUtils.addDays(startDate, ++daysInThePast));
-      helper.executeMonitorJob(batch);
+      migrationHelper.executeMonitorJob(batch);
     }
 
     ClockUtil.setCurrentTime(new Date());

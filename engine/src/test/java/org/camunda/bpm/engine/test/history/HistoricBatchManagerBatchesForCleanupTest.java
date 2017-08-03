@@ -20,7 +20,9 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
+import org.apache.commons.collections.map.HashedMap;
 import org.apache.commons.lang.time.DateUtils;
 import org.camunda.bpm.engine.HistoryService;
 import org.camunda.bpm.engine.ProcessEngineConfiguration;
@@ -95,16 +97,20 @@ public class HistoricBatchManagerBatchesForCleanupTest {
         { 5, -11, -6, -7, 1, 1 } });
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void testFindHistoricBatchIdsForCleanup() {
     // given
-    prepareHistoricBatches(2);
+    String batchType = prepareHistoricBatches(2);
+    final Map<String, Integer> batchOperationsMap = new HashedMap();
+    batchOperationsMap.put(batchType, historicBatchHistoryTTL);
+
 
     engineRule.getProcessEngineConfiguration().getCommandExecutorTxRequired().execute(new Command<Object>() {
       @Override
       public Object execute(CommandContext commandContext) {
         // when
-        List<String> historicBatchIdsForCleanup = commandContext.getHistoricBatchManager().findHistoricBatchIdsForCleanup(batchSize, historicBatchHistoryTTL);
+        List<String> historicBatchIdsForCleanup = commandContext.getHistoricBatchManager().findHistoricBatchIdsForCleanup(batchSize, batchOperationsMap);
 
         // then
         assertEquals(resultCount, historicBatchIdsForCleanup.size());
@@ -123,7 +129,7 @@ public class HistoricBatchManagerBatchesForCleanupTest {
     });
   }
 
-  private void prepareHistoricBatches(int batchesCount) {
+  private String prepareHistoricBatches(int batchesCount) {
     Date startDate = ClockUtil.getCurrentTime();
     ClockUtil.setCurrentTime(DateUtils.addDays(startDate, daysInThePast));
 
@@ -133,10 +139,12 @@ public class HistoricBatchManagerBatchesForCleanupTest {
     }
 
     Batch batch1 = list.get(0);
+    String batchType = batch1.getType();
     helper.executeSeedJob(batch1);
     helper.executeJobs(batch1);
     ClockUtil.setCurrentTime(DateUtils.addDays(startDate, batch1EndTime));
     helper.executeMonitorJob(batch1);
+
 
     Batch batch2 = list.get(1);
     helper.executeSeedJob(batch2);
@@ -145,5 +153,7 @@ public class HistoricBatchManagerBatchesForCleanupTest {
     helper.executeMonitorJob(batch2);
 
     ClockUtil.setCurrentTime(new Date());
+
+    return batchType;
   }
 }

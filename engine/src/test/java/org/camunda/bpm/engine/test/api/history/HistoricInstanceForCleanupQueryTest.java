@@ -17,6 +17,9 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.collections.map.HashedMap;
 import org.apache.commons.lang.time.DateUtils;
 import org.camunda.bpm.engine.CaseService;
 import org.camunda.bpm.engine.HistoryService;
@@ -200,6 +203,7 @@ public class HistoricInstanceForCleanupQueryTest {
     });
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void testSortHistoricBatchesForCleanup() {
     Date startDate = ClockUtil.getCurrentTime();
@@ -208,6 +212,10 @@ public class HistoricInstanceForCleanupQueryTest {
 
     // given
     List<Batch> list = Arrays.asList(helper.migrateProcessInstancesAsync(1), helper.migrateProcessInstancesAsync(1), helper.migrateProcessInstancesAsync(1));
+
+    String batchType = list.get(0).getType();
+    final Map<String, Integer> batchOperationsMap = new HashedMap();
+    batchOperationsMap.put(batchType, 4);
 
     for (Batch batch : list) {
       helper.executeSeedJob(batch);
@@ -226,7 +234,7 @@ public class HistoricInstanceForCleanupQueryTest {
       public Void execute(CommandContext commandContext) {
 
         HistoricBatchManager historicBatchManager = commandContext.getHistoricBatchManager();
-        List<String> ids = historicBatchManager.findHistoricBatchIdsForCleanup(7, 4);
+        List<String> ids = historicBatchManager.findHistoricBatchIdsForCleanup(7, batchOperationsMap);
         assertEquals(3, ids.size());
         HistoricBatchEntity instance0 = historicBatchManager.findHistoricBatchById(ids.get(0));
         HistoricBatchEntity instance1 = historicBatchManager.findHistoricBatchById(ids.get(1));

@@ -5,8 +5,9 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
+
 import org.camunda.bpm.engine.ProcessEngineException;
-import org.camunda.bpm.engine.batch.Batch;
 import org.camunda.bpm.engine.impl.cfg.ProcessEngineConfigurationImpl;
 import org.camunda.bpm.engine.impl.interceptor.CommandContext;
 
@@ -100,40 +101,8 @@ public abstract class HistoryCleanupHelper {
     return commandContext.getProcessEngineConfiguration().getHistoryCleanupBatchSize();
   }
 
-  private static Integer getBatchOperationHistoryTimeToLive(CommandContext commandContext) {
-    return commandContext.getProcessEngineConfiguration().getBatchOperationHistoryTimeToLive();
-  }
-
-  private static Integer getHistoricInstanceDeletionBatchOperationHTTL(CommandContext commandContext) {
-    return commandContext.getProcessEngineConfiguration().getHistoricInstanceDeletionBatchOperationHTTL();
-  }
-
-  private static Integer getInstanceDeletionBatchOperationHTTL(CommandContext commandContext) {
-    return commandContext.getProcessEngineConfiguration().getInstanceDeletionBatchOperationHTTL();
-  }
-
-  private static Integer getInstanceMigrationBatchOperationHTTL(CommandContext commandContext) {
-    return commandContext.getProcessEngineConfiguration().getInstanceMigrationBatchOperationHTTL();
-  }
-
-  private static Integer getInstanceModificationBatchOperationHTTL(CommandContext commandContext) {
-    return commandContext.getProcessEngineConfiguration().getInstanceModificationBatchOperationHTTL();
-  }
-
-  private static Integer getInstanceRestartBatchOperationHTTL(CommandContext commandContext) {
-    return commandContext.getProcessEngineConfiguration().getInstanceRestartBatchOperationHTTL();
-  }
-
-  private static Integer getInstanceUpdateSuspensionStateBatchOperationHTTL(CommandContext commandContext) {
-    return commandContext.getProcessEngineConfiguration().getInstanceUpdateSuspensionStateBatchOperationHTTL();
-  }
-
-  private static Integer getSetExternalTaskRetriesBatchOperationHTTL(CommandContext commandContext) {
-    return commandContext.getProcessEngineConfiguration().getSetExternalTaskRetriesBatchOperationHTTL();
-  }
-
-  private static Integer getSetJobRetriesBatchOperationHTTL(CommandContext commandContext) {
-    return commandContext.getProcessEngineConfiguration().getSetJobRetriesBatchOperationHTTL();
+  private static Map<String, Integer> getBatchOperationHistoryTimeToLiveMap(CommandContext commandContext) {
+    return commandContext.getProcessEngineConfiguration().getBatchOperationHistoryTimeToLiveMap();
   }
 
   /**
@@ -174,24 +143,18 @@ public abstract class HistoryCleanupHelper {
       }
     }
 
-    Integer batchOperationHistoryTimeToLive = getBatchOperationHistoryTimeToLive(commandContext);
 
     //if batch is not full, add batch ids
-    if (historyCleanupBatch.size() < batchSize && batchOperationHistoryTimeToLive != null) {
+    Map<String, Integer> batchOperationHistoryTimeToLiveMap = getBatchOperationHistoryTimeToLiveMap(commandContext);
+    if (historyCleanupBatch.size() < batchSize && batchOperationHistoryTimeToLiveMap != null && !batchOperationHistoryTimeToLiveMap.isEmpty()) {
       List<String> historicBatchIds = commandContext
           .getHistoricBatchManager()
-          .findHistoricBatchIdsForCleanup(batchSize - historyCleanupBatch.size(), batchOperationHistoryTimeToLive);
+          .findHistoricBatchIdsForCleanup(batchSize - historyCleanupBatch.size(), batchOperationHistoryTimeToLiveMap);
       if (historicBatchIds.size() > 0) {
         historyCleanupBatch.setHistoricBatchIds(historicBatchIds);
       }
     }
 
     return historyCleanupBatch;
-  }
-
-  public List<String> getBatchOperationsHTTL() {
-
-
-    return null;
   }
 }

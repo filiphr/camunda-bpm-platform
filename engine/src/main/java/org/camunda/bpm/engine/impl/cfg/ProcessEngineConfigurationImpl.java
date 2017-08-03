@@ -69,6 +69,7 @@ import org.camunda.bpm.engine.RuntimeService;
 import org.camunda.bpm.engine.TaskService;
 import org.camunda.bpm.engine.authorization.Permission;
 import org.camunda.bpm.engine.authorization.Permissions;
+import org.camunda.bpm.engine.batch.Batch;
 import org.camunda.bpm.engine.impl.AuthorizationServiceImpl;
 import org.camunda.bpm.engine.impl.DecisionServiceImpl;
 import org.camunda.bpm.engine.impl.DefaultArtifactFactory;
@@ -693,32 +694,7 @@ public abstract class ProcessEngineConfigurationImpl extends ProcessEngineConfig
   private Date historyCleanupBatchWindowEndTimeAsDate;
 
   private Integer batchOperationHistoryTimeToLive;
-  private Integer instanceMigrationBatchOperationHTTL;
-  private Integer instanceDeletionBatchOperationHTTL;
-  private Integer historicInstanceDeletionBatchOperationHTTL;
-  private Integer instanceUpdateSuspensionStateBatchOperationHTTL;
-  private Integer setJobRetriesBatchOperationHTTL;
-  private Integer instanceModificationBatchOperationHTTL;
-  private Integer instanceRestartBatchOperationHTTL;
-  private Integer setExternalTaskRetriesBatchOperationHTTL;
-
-  // "instance-migration";
-  // "instance-modification";
-  // "instance-restart";
-  // "instance-deletion";
-  // "instance-update-suspension-state";
-  // "historic-instance-deletion";
-  // "set-job-retries";
-  // "set-external-task-retries";
-
-//  private Integer migrateProcessInstanceBatchOperationHTTL;
-//  private Integer cancelProcessInstancesBatchOperationHTTL;
-//  private Integer deleteHistoricProcessInstancesBatchOperationHTTL;
-//  private Integer updateProcessInstancesSuspendStateBatchOperationHTTL;
-//  private Integer setJobsRetriesByProcessInstancesBatchOperationHTTL;
-//  private Integer processInstanceModificationBatchOperationHTTL;
-//  private Integer restartProcessInstancesBatchOperationHTTL;
-//  private Integer setExternalTasksRetriesBatchOperationHTTL;
+  private Map<String, Integer> batchOperationHistoryTimeToLiveMap;
 
   /**
    * Size of batch in which history cleanup data will be deleted. {@link HistoryCleanupBatch#MAX_BATCH_SIZE} must be respected.
@@ -816,40 +792,21 @@ public abstract class ProcessEngineConfigurationImpl extends ProcessEngineConfig
           "History cleanup batch threshold cannot be negative.");
     }
 
-    if (batchOperationHistoryTimeToLive != null && batchOperationHistoryTimeToLive < 0) {
-      throw LOG.invalidPropertyValue("batchOperationHistoryTimeToLive", String.valueOf(batchOperationHistoryTimeToLive),
-          "Batch operation history time to live cannot be negative.");
+    initBatchOperationsHistoryTimeToLive();
+  }
+
+  private void initBatchOperationsHistoryTimeToLive() {
+    if (batchOperationHistoryTimeToLiveMap == null) {
+      batchOperationHistoryTimeToLiveMap = new HashMap<String, Integer>();
     }
 
-    if (instanceDeletionBatchOperationHTTL != null && instanceDeletionBatchOperationHTTL < 0) {
-      throw LOG.invalidPropertyValue("instanceDeletionBatchOperationHTTL", String.valueOf(instanceDeletionBatchOperationHTTL),
-          "Instance deletion batch opeartion history time to live cannot be negative.");
-    }
+    if (batchHandlers != null && batchOperationHistoryTimeToLive != null) {
 
-    if (historicInstanceDeletionBatchOperationHTTL != null && historicInstanceDeletionBatchOperationHTTL < 0) {
-      throw LOG.invalidPropertyValue("historicInstanceDeletionBatchOperationHTTL", String.valueOf(historicInstanceDeletionBatchOperationHTTL),
-          "Historic instance deletion batch opeartion history time to live cannot be negative.");
-    }
-
-    if (instanceUpdateSuspensionStateBatchOperationHTTL != null && instanceUpdateSuspensionStateBatchOperationHTTL < 0) {
-      throw LOG.invalidPropertyValue("instanceUpdateSuspensionStateBatchOperationHTTL", String.valueOf(instanceUpdateSuspensionStateBatchOperationHTTL),
-          "Instance update suspension state batch opeartion history time to live cannot be negative.");
-    }
-    if (setJobRetriesBatchOperationHTTL != null && setJobRetriesBatchOperationHTTL < 0) {
-      throw LOG.invalidPropertyValue("setJobRetriesBatchOperationHTTL", String.valueOf(setJobRetriesBatchOperationHTTL),
-          "Set job retries batch opeartion history time to live cannot be negative.");
-    }
-    if (instanceModificationBatchOperationHTTL != null && instanceModificationBatchOperationHTTL < 0) {
-      throw LOG.invalidPropertyValue("instanceModificationBatchOperationHTTL", String.valueOf(instanceModificationBatchOperationHTTL),
-          "Instance modification batch opeartion history time to live cannot be negative.");
-    }
-    if (instanceRestartBatchOperationHTTL != null && instanceRestartBatchOperationHTTL < 0) {
-      throw LOG.invalidPropertyValue("instanceRestartBatchOperationHTTL", String.valueOf(instanceRestartBatchOperationHTTL),
-          "Instance restart batch opeartion history time to live cannot be negative.");
-    }
-    if (setExternalTaskRetriesBatchOperationHTTL != null && setExternalTaskRetriesBatchOperationHTTL < 0) {
-      throw LOG.invalidPropertyValue("setExternalTaskRetriesBatchOperationHTTL", String.valueOf(setExternalTaskRetriesBatchOperationHTTL),
-          "Set external task retries batch opeartion history time to live cannot be negative.");
+      for (String key : batchHandlers.keySet()) {
+        if (!batchOperationHistoryTimeToLiveMap.containsKey(key)) {
+          batchOperationHistoryTimeToLiveMap.put(key, batchOperationHistoryTimeToLive);
+        }
+      }
     }
   }
 
@@ -3805,68 +3762,8 @@ public abstract class ProcessEngineConfigurationImpl extends ProcessEngineConfig
     this.batchOperationHistoryTimeToLive = batchOperationHistoryTimeToLive;
   }
 
-  public Integer getInstanceMigrationBatchOperationHTTL() {
-    return instanceMigrationBatchOperationHTTL;
-  }
-
-  public void setInstanceMigrationBatchOperationHTTL(Integer instanceMigrationBatchOperationHTTL) {
-    this.instanceMigrationBatchOperationHTTL = instanceMigrationBatchOperationHTTL;
-  }
-
-  public Integer getInstanceDeletionBatchOperationHTTL() {
-    return instanceDeletionBatchOperationHTTL;
-  }
-
-  public void setInstanceDeletionBatchOperationHTTL(Integer instanceDeletionBatchOperationHTTL) {
-    this.instanceDeletionBatchOperationHTTL = instanceDeletionBatchOperationHTTL;
-  }
-
-  public Integer getHistoricInstanceDeletionBatchOperationHTTL() {
-    return historicInstanceDeletionBatchOperationHTTL;
-  }
-
-  public void setHistoricInstanceDeletionBatchOperationHTTL(Integer historicInstanceDeletionBatchOperationHTTL) {
-    this.historicInstanceDeletionBatchOperationHTTL = historicInstanceDeletionBatchOperationHTTL;
-  }
-
-  public Integer getInstanceUpdateSuspensionStateBatchOperationHTTL() {
-    return instanceUpdateSuspensionStateBatchOperationHTTL;
-  }
-
-  public void setInstanceUpdateSuspensionStateBatchOperationHTTL(Integer instanceUpdateSuspensionStateBatchOperationHTTL) {
-    this.instanceUpdateSuspensionStateBatchOperationHTTL = instanceUpdateSuspensionStateBatchOperationHTTL;
-  }
-
-  public Integer getSetJobRetriesBatchOperationHTTL() {
-    return setJobRetriesBatchOperationHTTL;
-  }
-
-  public void setSetJobRetriesBatchOperationHTTL(Integer setJobRetriesBatchOperationHTTL) {
-    this.setJobRetriesBatchOperationHTTL = setJobRetriesBatchOperationHTTL;
-  }
-
-  public Integer getInstanceModificationBatchOperationHTTL() {
-    return instanceModificationBatchOperationHTTL;
-  }
-
-  public void setInstanceModificationBatchOperationHTTL(Integer instanceModificationBatchOperationHTTL) {
-    this.instanceModificationBatchOperationHTTL = instanceModificationBatchOperationHTTL;
-  }
-
-  public Integer getInstanceRestartBatchOperationHTTL() {
-    return instanceRestartBatchOperationHTTL;
-  }
-
-  public void setInstanceRestartBatchOperationHTTL(Integer instanceRestartBatchOperationHTTL) {
-    this.instanceRestartBatchOperationHTTL = instanceRestartBatchOperationHTTL;
-  }
-
-  public Integer getSetExternalTaskRetriesBatchOperationHTTL() {
-    return setExternalTaskRetriesBatchOperationHTTL;
-  }
-
-  public void setSetExternalTaskRetriesBatchOperationHTTL(Integer setExternalTaskRetriesBatchOperationHTTL) {
-    this.setExternalTaskRetriesBatchOperationHTTL = setExternalTaskRetriesBatchOperationHTTL;
+  public Map<String, Integer> getBatchOperationHistoryTimeToLiveMap() {
+    return batchOperationHistoryTimeToLiveMap;
   }
 
   public int getFailedJobListenerMaxRetries() {
