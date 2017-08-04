@@ -3766,6 +3766,10 @@ public abstract class ProcessEngineConfigurationImpl extends ProcessEngineConfig
     return batchOperationHistoryTimeToLiveMap;
   }
 
+  public void setBatchOperationHistoryTimeToLiveMap(Map<String, Integer> batchOperationHistoryTimeToLiveMap) {
+    this.batchOperationHistoryTimeToLiveMap = batchOperationHistoryTimeToLiveMap;
+  }
+
   public int getFailedJobListenerMaxRetries() {
     return failedJobListenerMaxRetries;
   }
