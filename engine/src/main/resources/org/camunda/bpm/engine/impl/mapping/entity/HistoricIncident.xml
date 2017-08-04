@@ -95,6 +95,20 @@
     in (<include refid="selectHistoricIncidentByBatchIds" />)
   </delete>
 
+  <delete id="deleteHistoricIncidentsByBatchIds_mysql">
+    delete HI.* from ${prefix}ACT_HI_INCIDENT HI
+    inner join ${prefix}ACT_HI_BATCH HB
+    on HI.JOB_DEF_ID_ in
+      (HB.SEED_JOB_DEF_ID_,
+       HB.MONITOR_JOB_DEF_ID_,
+       HB.BATCH_JOB_DEF_ID_)
+    where HB.ID_ in
+    <foreach item="batchId" index="index" collection="list" open="(" separator="," close=")">
+       #{batchId}
+    </foreach>
+    and HI.JOB_DEF_ID_ is not null
+  </delete>
+
   <!-- HISTORIC INCIDENT RESULTMAP -->
 
   <resultMap id="historicIncidentResultMap" type="org.camunda.bpm.engine.impl.persistence.entity.HistoricIncidentEntity">
@@ -217,7 +231,6 @@
        #{batchId}
     </foreach>
     and HI.JOB_DEF_ID_ is not null
-    and HI.END_TIME_ is not null
   </sql>
 
 </mapper>
