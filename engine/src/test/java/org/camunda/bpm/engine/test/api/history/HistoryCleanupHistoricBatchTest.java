@@ -216,6 +216,7 @@ public class HistoryCleanupHistoricBatchTest {
     Map<String, Integer> map = new HashMap<String, Integer>();
     map.put("instance-migration", 2);
     map.put("instance-deletion", 5);
+    processEngineConfiguration.setBatchOperationHistoryTimeToLive(null);
     processEngineConfiguration.setBatchOperationHistoryTimeToLiveMap(map);
     processEngineConfiguration.initHistoryCleanup();
 
@@ -348,17 +349,17 @@ public class HistoryCleanupHistoricBatchTest {
 
   private Batch createFailingMigrationBatch() {
     BpmnModelInstance instance = createModelInstance();
-  
+
     ProcessDefinition sourceProcessDefinition = migrationRule.deployAndGetDefinition(instance);
     ProcessDefinition targetProcessDefinition = migrationRule.deployAndGetDefinition(instance);
-  
+
     MigrationPlan migrationPlan = runtimeService
         .createMigrationPlan(sourceProcessDefinition.getId(), targetProcessDefinition.getId())
         .mapEqualActivities()
         .build();
-  
+
     ProcessInstance processInstance = runtimeService.startProcessInstanceById(sourceProcessDefinition.getId());
-  
+
     Batch batch = runtimeService.newMigration(migrationPlan).processInstanceIds(Arrays.asList(processInstance.getId(), "unknownId")).executeAsync();
     return batch;
   }
